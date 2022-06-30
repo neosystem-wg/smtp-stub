@@ -1,0 +1,73 @@
+<?xml version="1.0"?>
+<mailetcontainer enableJmx="false">
+    <context>
+        <postmaster>postmaster</postmaster>
+    </context>
+
+    <spooler>
+        <threads>20</threads>
+    </spooler>
+
+    <processors>
+        <processor state="root" enableJmx="false">
+            <mailet match="All" class="jp.co.neosystem.wg.smtp.stub.SaveMessageMailet"/>
+            <mailet match="All" class="Null"/>
+        </processor>
+
+        <processor state="error" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="transport" enableJmx="false">
+            <mailet match="All" class="RemoveMimeHeader">
+                <name>bcc</name>
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="local-delivery" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="relay" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="local-address-error" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="relay-denied" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="bounces" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+        <processor state="rrt-error" enableJmx="false">
+            <mailet match="All" class="Null">
+                <onMailetException>ignore</onMailetException>
+            </mailet>
+        </processor>
+
+    </processors>
+
+</mailetcontainer>
+
+

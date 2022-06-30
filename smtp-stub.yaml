@@ -1,0 +1,5 @@
+response:
+  - dst: fuga@example.com
+    returnCode: 501
+    smtpDescription: test
+directoryPrefixHeader: x-user-ref
