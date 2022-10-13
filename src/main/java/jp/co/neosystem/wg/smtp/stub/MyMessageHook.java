@@ -23,8 +23,8 @@ public class MyMessageHook implements MessageHook {
 
         LOGGER.info("MyMessageHook.onMessage()");
 
-        List<MailAddress> recipeients = mailEnvelope.getRecipients();
-        for (MailAddress recipient: recipeients) {
+        List<MailAddress> recipients = mailEnvelope.getRecipients();
+        for (MailAddress recipient: recipients) {
             ResponseConfig config = getResposneConfig(SmtpStubMain.getSmtpStubConfig(), recipient);
             if (config != null) {
                 HookResult result = new HookResult.Builder()

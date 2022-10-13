@@ -1,14 +1,21 @@
 package jp.co.neosystem.wg.smtp.stub;
 
+import com.ibm.icu.util.Output;
+import com.sun.mail.util.BASE64DecoderStream;
+import com.sun.mail.util.QPDecoderStream;
 import jp.co.neosystem.wg.smtp.stub.conf.SmtpStubConfig;
+import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.mailet.Mail;
 import org.apache.mailet.base.GenericMailet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import javax.mail.BodyPart;
 import javax.mail.Header;
 import javax.mail.MessagingException;
+import javax.mail.Multipart;
+import javax.mail.internet.MimePart;
 import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -22,7 +29,7 @@ public class SaveMessageMailet extends GenericMailet {
 	@Override
 	public void service(Mail mail) throws MessagingException {
 		var sender = mail.getMaybeSender();
-		LOGGER.info("MyCustomeMailet.service()");
+		LOGGER.info("SaveMessageMailet.service()");
 		LOGGER.info("sender {}", sender.toString());
 
 		var message = mail.getMessage();
@@ -45,19 +52,72 @@ public class SaveMessageMailet extends GenericMailet {
 			saveHeaders(message.getAllHeaders(), headersFile);
 
 			Object content = message.getContent();
-			File contentFile = new File(directory, "content.txt");
-			saveContent(content.toString(), contentFile);
+			if (content instanceof Multipart) {
+				Multipart multipart = (Multipart) content;
+				for (int i = 0; i < multipart.getCount(); ++i) {
+					BodyPart bodyPart = multipart.getBodyPart(i);
+					String fileName = bodyPart.getFileName();
+					if (StringUtils.isEmpty(fileName)) {
+						fileName = String.format("content%03d.dat", i + 1);
+					}
+					File contentFile = new File(directory, fileName);
+					saveMultipart(bodyPart, contentFile);
+				}
+			} else {
+				File contentFile = new File(directory, "content.dat");
+				saveContent(content, contentFile);
+			}
 		} catch (IOException e) {
 			LOGGER.warn(e.getMessage(), e);
 		}
 		return;
 	}
 
-	private void saveContent(String content, File fileName) throws IOException {
-		try (FileOutputStream fileOutputStream = new FileOutputStream(fileName);
-			 OutputStreamWriter outputStreamWriter = new OutputStreamWriter(fileOutputStream)) {
-			outputStreamWriter.write(content);
+	private void saveContent(Object content, File fileName) throws IOException, MessagingException {
+		try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+			if (content instanceof String) {
+				String str = (String) content;
+				fileOutputStream.write(str.getBytes());
+			} else {
+				LOGGER.info("unknown type: {}", content.getClass().getName());
+			}
 		}
+		return;
+	}
+
+	private void saveMultipart(BodyPart bodyPart, File fileName) throws IOException, MessagingException {
+		try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+			saveMultipartImpl(bodyPart, fileOutputStream);
+		}
+		return;
+	}
+
+	private void saveMultipartImpl(BodyPart bodyPart, OutputStream stream) throws MessagingException, IOException {
+		Object content = bodyPart.getContent();
+		if (content instanceof String) {
+			String tmp = (String) content;
+			stream.write(tmp.getBytes());
+		} else if (content instanceof BASE64DecoderStream) {
+			BASE64DecoderStream base64DecoderStream = (BASE64DecoderStream) content;
+			saveBase64DecoderStream(base64DecoderStream, stream);
+		} else if (content instanceof QPDecoderStream) {
+			QPDecoderStream qpDecoderStream = (QPDecoderStream) content;
+			saveQPDecoderStream(qpDecoderStream, stream);
+		} else {
+			LOGGER.info("unknown type(saveMultipartImpl): {}", content.getClass().getName());
+		}
+		return;
+	}
+
+	private void saveBase64DecoderStream(BASE64DecoderStream base64DecoderStream, OutputStream stream) throws IOException {
+		byte[] bytes = IOUtils.toByteArray(base64DecoderStream);
+		stream.write(bytes);
+		return;
+	}
+
+	private void saveQPDecoderStream(QPDecoderStream qpDecoderStream, OutputStream stream) throws IOException {
+		byte[] bytes = IOUtils.toByteArray(qpDecoderStream);
+		stream.write(bytes);
 		return;
 	}
 
