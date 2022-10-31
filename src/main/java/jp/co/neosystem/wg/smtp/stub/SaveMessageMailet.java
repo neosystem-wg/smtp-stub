@@ -47,6 +47,8 @@ public class SaveMessageMailet extends GenericMailet {
 		File directory = new File(config.getSaveDirectory(), directoryName);
 		directory.mkdir();
 
+		Counter counter = new Counter();
+
 		try {
 			File headersFile = new File(directory, "headers.txt");
 			saveHeaders(message.getAllHeaders(), headersFile);
@@ -54,15 +56,7 @@ public class SaveMessageMailet extends GenericMailet {
 			Object content = message.getContent();
 			if (content instanceof Multipart) {
 				Multipart multipart = (Multipart) content;
-				for (int i = 0; i < multipart.getCount(); ++i) {
-					BodyPart bodyPart = multipart.getBodyPart(i);
-					String fileName = bodyPart.getFileName();
-					if (StringUtils.isEmpty(fileName)) {
-						fileName = String.format("content%03d.dat", i + 1);
-					}
-					File contentFile = new File(directory, fileName);
-					saveMultipart(bodyPart, contentFile);
-				}
+				saveMultipart(counter, directory, multipart);
 			} else {
 				File contentFile = new File(directory, "content.dat");
 				saveContent(content, contentFile);
@@ -85,8 +79,41 @@ public class SaveMessageMailet extends GenericMailet {
 		return;
 	}
 
-	private void saveMultipart(BodyPart bodyPart, File fileName) throws IOException, MessagingException {
-		try (FileOutputStream fileOutputStream = new FileOutputStream(fileName)) {
+	private void saveMultipart(Counter counter, File directory, Multipart multipart) throws MessagingException, IOException {
+		for (int i = 0; i < multipart.getCount(); ++i) {
+			BodyPart bodyPart = multipart.getBodyPart(i);
+			saveMultipart(counter, directory, bodyPart);
+		}
+		return;
+	}
+
+	private void saveMultipart(Counter counter, File directory, BodyPart bodyPart) throws IOException, MessagingException {
+		Object content = bodyPart.getContent();
+		if (content instanceof Multipart) {
+			String headerFileName = String.format("header%03d.txt", counter.getNewCount());
+			File headerFile = new File(directory, headerFileName);
+			saveHeaders(bodyPart.getAllHeaders(), headerFile);
+
+			Multipart multipart = (Multipart) content;
+			saveMultipart(counter, directory, multipart);
+			return;
+		}
+
+		String headerFileName = null;
+		String fileName = bodyPart.getFileName();
+		if (StringUtils.isEmpty(fileName)) {
+			int index = counter.getNewCount();
+			fileName = String.format("content%03d.dat", index);
+			headerFileName = headerFileName = String.format("header%03d.txt", index);
+		} else {
+			headerFileName = String.format("%s-header.txt", fileName);
+		}
+
+		File headerFile = new File(directory, headerFileName);
+		saveHeaders(bodyPart.getAllHeaders(), headerFile);
+
+		File contentFile = new File(directory, fileName);
+		try (FileOutputStream fileOutputStream = new FileOutputStream(contentFile)) {
 			saveMultipartImpl(bodyPart, fileOutputStream);
 		}
 		return;
@@ -138,5 +165,18 @@ public class SaveMessageMailet extends GenericMailet {
 		}
 		writer.flush();
 		return;
+	}
+
+	private static class Counter {
+		private int count;
+
+		public Counter() {
+			count = 0;
+		}
+
+		public int getNewCount() {
+			++count;
+			return count;
+		}
 	}
 }
