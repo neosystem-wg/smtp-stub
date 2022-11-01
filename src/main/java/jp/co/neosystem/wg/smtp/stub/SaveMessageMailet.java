@@ -1,6 +1,5 @@
 package jp.co.neosystem.wg.smtp.stub;
 
-import com.ibm.icu.util.Output;
 import com.sun.mail.util.BASE64DecoderStream;
 import com.sun.mail.util.QPDecoderStream;
 import jp.co.neosystem.wg.smtp.stub.conf.SmtpStubConfig;
@@ -11,11 +10,9 @@ import org.apache.mailet.base.GenericMailet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import javax.mail.BodyPart;
-import javax.mail.Header;
-import javax.mail.MessagingException;
-import javax.mail.Multipart;
-import javax.mail.internet.MimePart;
+import javax.mail.*;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 import java.io.*;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -28,12 +25,11 @@ public class SaveMessageMailet extends GenericMailet {
 
 	@Override
 	public void service(Mail mail) throws MessagingException {
-		var sender = mail.getMaybeSender();
-		LOGGER.info("SaveMessageMailet.service()");
-		LOGGER.info("sender {}", sender.toString());
-
 		var message = mail.getMessage();
-		String directoryName = message.getMessageID().replaceAll("[<>]", "");
+		final String messageId = message.getMessageID();
+		LOGGER.info("receive mail (message ID: {}, subject: {})", messageId, message.getSubject());
+
+		String directoryName = messageId.replaceAll("[<>]", "");
 		SmtpStubConfig config = SmtpStubMain.getSmtpStubConfig();
 
 		if (StringUtils.isNotEmpty(config.getDirectoryPrefixHeader())) {
@@ -50,6 +46,8 @@ public class SaveMessageMailet extends GenericMailet {
 		Counter counter = new Counter();
 
 		try {
+			saveMailInfo(directory, message);
+
 			File headersFile = new File(directory, "headers.txt");
 			saveHeaders(message.getAllHeaders(), headersFile);
 
@@ -63,6 +61,26 @@ public class SaveMessageMailet extends GenericMailet {
 			}
 		} catch (IOException e) {
 			LOGGER.warn(e.getMessage(), e);
+		}
+		return;
+	}
+
+	private void saveMailInfo(File directory, MimeMessage message) throws IOException, MessagingException {
+		File fileName = new File(directory, "mail_info.txt");
+		try (FileOutputStream fileOutputStream = new FileOutputStream(fileName); PrintStream printStream = new PrintStream(fileOutputStream)) {
+			printStream.println(message.getSubject());
+
+			Address sender = message.getSender();
+			if (sender != null) {
+				Address[] senders = {sender};
+				String senderString = InternetAddress.toUnicodeString(senders);
+				printStream.println(senderString);
+			}
+			Address[] from = message.getFrom();
+			if (from != null) {
+				String fromString = InternetAddress.toUnicodeString(from);
+				printStream.println(fromString);
+			}
 		}
 		return;
 	}
